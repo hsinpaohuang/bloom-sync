@@ -1,4 +1,5 @@
 import { bexBackground } from 'quasar/wrappers';
+import { StandardBloomFilter } from './filters/bloom-filter';
 
 function openExtension() {
   chrome.tabs.create(
@@ -14,35 +15,40 @@ function openExtension() {
 chrome.runtime.onInstalled.addListener(openExtension);
 chrome.action.onClicked.addListener(openExtension);
 
-declare module '@quasar/app-vite' {
-  interface BexEventMap {
-    getHistory: [string[]];
-  }
-}
+// declare module '@quasar/app-vite' {
+//   interface BexEventMap {
+//   }
+// }
 
-const browsingHistory = new Set<string>();
+const browsingHistory = new StandardBloomFilter();
 
-function onNavigation(
-  details: chrome.webNavigation.WebNavigationFramedCallbackDetails,
-) {
+function onNavigation({
+  frameType,
+  url,
+}: chrome.webNavigation.WebNavigationFramedCallbackDetails) {
   // ignore iframes
-  if (details.frameType !== 'outermost_frame') {
+  if (frameType !== 'outermost_frame') {
     return;
   }
 
   // ignore non-http requests (e.g. chrome://)
-  if (!details.url.startsWith('http')) {
+  if (!url.startsWith('http')) {
     return;
   }
 
-  browsingHistory.add(details.url);
+  console.time('check');
+  const { result: isInHistory, cache } = browsingHistory.get(url);
+  console.timeEnd('check');
+  if (isInHistory) {
+    console.log('[BloomTwitter] visited');
+    return;
+  }
+
+  console.log('[BloomTwitter] not visited');
+  browsingHistory.put(url, cache);
 }
 
-export default bexBackground((bridge /* , allActiveConnections */) => {
-  bridge.on('getHistory', ({ respond }) => {
-    respond(Array.from(browsingHistory));
-  });
-
+export default bexBackground((_bridge /* , allActiveConnections */) => {
   // avoid attaching duplicate listeners every time the user opens a tab
   const hasNavListener =
     chrome.webNavigation.onCompleted.hasListener(onNavigation);
