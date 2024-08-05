@@ -1,7 +1,7 @@
-type GetOutput = { result: false; cache: number[] } | { result: true };
+type GetOutput<T> = { result: false; cache: Readonly<T> } | { result: true };
 
-export interface Filter {
-  put(text: string, cache: number[]): void;
-  get(text: string): GetOutput;
+export interface Filter<T> {
+  put(text: string, cache: T): void;
+  get(text: string): GetOutput<T>;
   delete(text: string): void;
 }

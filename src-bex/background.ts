@@ -1,5 +1,6 @@
 import { bexBackground } from 'quasar/wrappers';
 import { StandardBloomFilter } from './filters/bloom-filter';
+import { CuckooFilter } from './filters/cuckoo-filter';
 
 function openExtension() {
   chrome.tabs.create(
@@ -20,7 +21,8 @@ chrome.action.onClicked.addListener(openExtension);
 //   }
 // }
 
-const browsingHistory = new StandardBloomFilter();
+const bloomFilter = new StandardBloomFilter();
+const cuckooFilter = new CuckooFilter(10_000);
 
 function onNavigation({
   frameType,
@@ -36,16 +38,31 @@ function onNavigation({
     return;
   }
 
-  console.time('check');
-  const { result: isInHistory, cache } = browsingHistory.get(url);
-  console.timeEnd('check');
-  if (isInHistory) {
-    console.log('[BloomTwitter] visited');
-    return;
+  console.time('[BloomFilter] get');
+  const { result: bfIsInHistory, cache: bfCache } = bloomFilter.get(url);
+  console.timeEnd('[BloomFilter] get');
+  if (bfIsInHistory) {
+    console.log(`[BloomFilter] visited: ${url}`);
+  } else {
+    console.log(`[BloomFilter] not visited: ${url}`);
+
+    console.time('[BloomFilter] put');
+    bloomFilter.put(url, bfCache);
+    console.timeEnd('[BloomFilter] put');
   }
 
-  console.log('[BloomTwitter] not visited');
-  browsingHistory.put(url, cache);
+  console.time('[CuckooFilter] get');
+  const { result: cfIsInHistory, cache: cfCache } = cuckooFilter.get(url);
+  console.timeEnd('[CuckooFilter] get');
+  if (cfIsInHistory) {
+    console.log(`[CuckooFilter] visited: ${url}`);
+  } else {
+    console.log(`[CuckooFilter] not visited: ${url}`);
+
+    console.time('[CuckooFilter] put');
+    cuckooFilter.put(url, cfCache);
+    console.timeEnd('[CuckooFilter] put');
+  }
 }
 
 export default bexBackground((_bridge /* , allActiveConnections */) => {
