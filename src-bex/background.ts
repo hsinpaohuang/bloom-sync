@@ -1,28 +1,39 @@
 import { bexBackground } from 'quasar/wrappers';
 import { StandardBloomFilter } from './filters/bloom-filter';
 import { CuckooFilter } from './filters/cuckoo-filter';
+import { RedditAPI, Status } from './utils/RedditAPI';
+import { StorageHandler } from './utils/storage';
 
-function openExtension() {
-  chrome.tabs.create(
-    {
-      url: chrome.runtime.getURL('www/index.html'),
-    },
-    (/* newTab */) => {
-      // Tab opened.
-    },
-  );
+chrome.runtime.onInstalled.addListener(() =>
+  chrome.tabs.create({
+    url: chrome.runtime.getURL('www/index.html#/welcome'),
+  }),
+);
+
+chrome.action.onClicked.addListener(() => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('www/index.html') });
+});
+
+type AuthroiseResult =
+  | { success: true }
+  | { success: false; error: { message: string; cause: unknown } };
+
+declare module '@quasar/app-vite' {
+  interface BexEventMap {
+    getAuthURL: [never, string];
+    authorise: [
+      { status: Status; code: string; state: string },
+      AuthroiseResult,
+    ];
+    setSyncKey: [string, boolean];
+  }
 }
-
-chrome.runtime.onInstalled.addListener(openExtension);
-chrome.action.onClicked.addListener(openExtension);
-
-// declare module '@quasar/app-vite' {
-//   interface BexEventMap {
-//   }
-// }
 
 const bloomFilter = new StandardBloomFilter();
 const cuckooFilter = new CuckooFilter(10_000);
+
+const storage = new StorageHandler();
+const redditAPI = new RedditAPI(storage);
 
 function onNavigation({
   frameType,
@@ -65,13 +76,34 @@ function onNavigation({
   }
 }
 
-export default bexBackground((_bridge /* , allActiveConnections */) => {
+export default bexBackground(async (bridge /* , allActiveConnections */) => {
   // avoid attaching duplicate listeners every time the user opens a tab
   const hasNavListener =
     chrome.webNavigation.onCompleted.hasListener(onNavigation);
-  if (hasNavListener) {
-    return;
+  if (!hasNavListener) {
+    chrome.webNavigation.onCompleted.addListener(onNavigation);
   }
 
-  chrome.webNavigation.onCompleted.addListener(onNavigation);
+  const currentTab = (
+    await chrome.tabs.query({ currentWindow: true, active: true })
+  )[0];
+  if (currentTab.url?.includes(chrome.runtime.id)) {
+    bridge.on('setSyncKey', async ({ data, respond }) => {
+      await storage.set('syncKey', data);
+      respond(true);
+    });
+    bridge.on('getAuthURL', ({ respond }) => {
+      respond(redditAPI.authURL);
+    });
+    bridge.on('authorise', async ({ data, respond }) => {
+      const { status, code, state } = data;
+      try {
+        await redditAPI.authorise(status, code, state);
+        respond({ success: true });
+      } catch (e) {
+        const { message, cause } = e as Error;
+        respond({ success: false, error: { message, cause } });
+      }
+    });
+  }
 });
