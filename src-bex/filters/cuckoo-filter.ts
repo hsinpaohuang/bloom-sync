@@ -26,15 +26,14 @@ export class CuckooFilter implements Filter<[number, string]> {
   private fingerprintSize: number;
   private maxKicks: number;
   private buckets: Bucket[] = [];
-
-  // todo: seed generation
-  private seed = 1;
+  private seed: number;
 
   constructor(
     capacity: number,
     errorRate = 0.000_000_1,
     bucketSize = 4,
     maxKicks = 500,
+    syncKey: string,
   ) {
     this.capacity = capacity;
     this.bucketSize = bucketSize;
@@ -42,6 +41,7 @@ export class CuckooFilter implements Filter<[number, string]> {
       Math.log2(1 / errorRate) + Math.log2(2 * bucketSize),
     );
     this.maxKicks = maxKicks;
+    this.seed = this.initialiseSeed(syncKey);
   }
 
   put(_text: string, cache: Readonly<[number, string]> = [0, '']) {
@@ -128,5 +128,9 @@ export class CuckooFilter implements Filter<[number, string]> {
     }
 
     return this.buckets[index].put(fingerprint);
+  }
+
+  private initialiseSeed(key: string) {
+    return new Murmurhash(key).result();
   }
 }

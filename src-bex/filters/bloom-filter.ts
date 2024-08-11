@@ -1,5 +1,5 @@
+import MurmurHash from 'imurmurhash';
 import type { Filter } from './filter';
-import Murmurhash from 'imurmurhash';
 
 /*
  * Reference:
@@ -13,19 +13,20 @@ export class StandardBloomFilter implements Filter<number[]> {
   private size: number;
   private numItems = 0;
   private maxItems: number;
+  private seeds: number[];
 
-  // todo: seed generation
-  private seeds = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-  ];
-
-  constructor(size = 60_000, maxItems = 1_336) {
+  constructor(size = 60_000, maxItems = 1_336, syncKey: string) {
     this.bitArray = [];
     this.size = size;
     this.maxItems = maxItems;
+    this.seeds = this.initialiseSeeds(syncKey);
   }
 
   put(text: string, cache: number[] = []) {
+    if (this.numItems > this.maxItems) {
+      throw new Error('Bloom filter is full', { cause: 'bloom_filter_full' });
+    }
+
     this.seeds.forEach((seed, index) => {
       if (index < cache.length) {
         this.bitArray[cache[index]] = 1;
@@ -35,6 +36,8 @@ export class StandardBloomFilter implements Filter<number[]> {
       const bitArrIndex = this.hash(text, seed);
       this.bitArray[bitArrIndex] = 1;
     });
+
+    this.numItems++;
   }
 
   get(text: string) {
@@ -57,6 +60,18 @@ export class StandardBloomFilter implements Filter<number[]> {
   }
 
   private hash(text: string, seed: number) {
-    return new Murmurhash(text, seed).result() % this.size;
+    return new MurmurHash(text, seed).result() % this.size;
+  }
+
+  private initialiseSeeds(key: string) {
+    const seedCharWithIndex = Array.from(key).map(
+      (char, index) => `${index}_${char}`,
+    );
+    const hash = new MurmurHash();
+
+    return seedCharWithIndex.map(char => {
+      hash.reset();
+      return hash.hash(char).result();
+    });
   }
 }
