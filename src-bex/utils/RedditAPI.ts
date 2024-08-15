@@ -199,6 +199,8 @@ export class RedditAPI {
   }
 
   async submit(subreddit: string, title: string, content: string) {
+    await this.refreshAccessToken();
+
     const body = new FormData();
     body.append('sr', subreddit);
     body.append('kind', 'self');
@@ -224,6 +226,8 @@ export class RedditAPI {
   }
 
   async edit(name: string, content: string) {
+    await this.refreshAccessToken();
+
     const body = new FormData();
     body.append('api_type', 'json');
     body.append('text', content);
@@ -247,9 +251,15 @@ export class RedditAPI {
 
   private async refreshAccessToken() {
     if (!this.refreshToken) {
-      throw new Error('refreshToken is not defined', {
-        cause: 'missing_refresh_token',
-      });
+      const refreshToken = await this.storageHandler.get('redditRefreshToken');
+
+      if (!refreshToken) {
+        throw new Error('refreshToken is not defined', {
+          cause: 'missing_refresh_token',
+        });
+      }
+
+      this.refreshToken = refreshToken;
     }
 
     const isTokenExpired = Date.now() - this.expireAt < 1000; // 1 second of buffer

@@ -1,11 +1,12 @@
-type GetOutput<Cache> =
-  | { result: false; cache: Readonly<Cache> }
-  | { result: true };
-
-export interface Filter<FilterData extends Record<string, unknown>, Cache> {
-  put(text: string, cache?: Cache): void;
-  get(text: string): GetOutput<Cache>;
+export interface Filter<FilterData = Record<string, unknown>> {
+  put(text: string): void;
+  get(text: string): boolean;
   delete(text: string): void;
   export(): FilterData;
   load(filter: FilterData): void;
+}
+
+export enum FilterType {
+  StandardBloomFilter = 'StandardBloomFilter',
+  CuckooFilter = 'CuckooFilter',
 }

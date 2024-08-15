@@ -16,7 +16,7 @@ export type SBFData = {
  * https://doi.org/10.1145/362686.362692
  */
 
-export class StandardBloomFilter implements Filter<SBFData, number[]> {
+export class StandardBloomFilter implements Filter<SBFData> {
   private bitArray: number[];
   private size: number;
   private numItems = 0;
@@ -27,24 +27,19 @@ export class StandardBloomFilter implements Filter<SBFData, number[]> {
   // therefore, we limit BITS_PER_CHUNK to 8 to avoid errors
   private static BITS_PER_CHUNK = 8 as const;
 
-  constructor(size = 60_000, maxItems = 1_336, syncKey: string) {
+  constructor(syncKey: string, size: number, maxItems: number) {
+    this.seeds = this.initialiseSeeds(syncKey);
     this.bitArray = [];
     this.size = size;
     this.maxItems = maxItems;
-    this.seeds = this.initialiseSeeds(syncKey);
   }
 
-  put(text: string, cache: number[] = []) {
+  put(text: string) {
     if (this.numItems > this.maxItems) {
       throw new Error('Bloom filter is full', { cause: 'bloom_filter_full' });
     }
 
-    this.seeds.forEach((seed, index) => {
-      if (index < cache.length) {
-        this.bitArray[cache[index]] = 1;
-        return;
-      }
-
+    this.seeds.forEach(seed => {
       const bitArrIndex = this.hash(text, seed);
       this.bitArray[bitArrIndex] = 1;
     });
@@ -60,11 +55,11 @@ export class StandardBloomFilter implements Filter<SBFData, number[]> {
       cache.push(index);
 
       if (!this.bitArray[index]) {
-        return { result: false, cache };
+        return false;
       }
     }
 
-    return { result: true } as const;
+    return true;
   }
 
   delete(_: string) {
@@ -93,9 +88,17 @@ export class StandardBloomFilter implements Filter<SBFData, number[]> {
   }
 
   private initialiseSeeds(key: string) {
-    const seedCharWithIndex = Array.from(key).map(
+    // slice the 36 characters key into 18 chunks of 2 character strings
+    // reference: https://stackoverflow.com/a/7033662
+    const slicedKey = key.match(/.{1,2}/g);
+    if (slicedKey === null) {
+      throw new Error('Invalid Sync Key', { cause: 'sync_key_invalid' });
+    }
+
+    const seedCharWithIndex = slicedKey.map(
       (char, index) => `${index}_${char}`,
     );
+
     const hash = new MurmurHash();
 
     return seedCharWithIndex.map(char => {

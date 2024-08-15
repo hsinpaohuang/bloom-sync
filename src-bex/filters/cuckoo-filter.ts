@@ -30,7 +30,7 @@ export type CFData = {
  * Accessed 05 Aug. 2024
  */
 
-export class CuckooFilter implements Filter<CFData, [number, string]> {
+export class CuckooFilter implements Filter<CFData> {
   private maxItems: number;
   private numItems = 0;
   private bucketSize;
@@ -40,28 +40,28 @@ export class CuckooFilter implements Filter<CFData, [number, string]> {
   private seed: number;
 
   constructor(
+    syncKey: string,
     maxItems: number,
-    errorRate = 0.000_000_1,
+    errorRate = 10e-7,
     bucketSize = 4,
     maxKicks = 500,
-    syncKey: string,
   ) {
+    this.seed = this.initialiseSeed(syncKey);
     this.maxItems = maxItems;
     this.bucketSize = bucketSize;
     this.fingerprintSize = Math.ceil(
       Math.log2(1 / errorRate) + Math.log2(2 * bucketSize),
     );
     this.maxKicks = maxKicks;
-    this.seed = this.initialiseSeed(syncKey);
   }
 
-  put(text: string, cache?: Readonly<[number, string]>) {
+  put(text: string) {
     if (this.numItems > this.maxItems) {
       throw new Error('Cuckoo Filter is full', { cause: 'cuckoo_filter_full' });
     }
 
-    const firstIndex = cache?.[0] || this.hash(text) % this.maxItems;
-    let fingerprint = cache?.[1] || this.fingerprint(firstIndex);
+    const firstIndex = this.hash(text) % this.maxItems;
+    let fingerprint = this.fingerprint(firstIndex);
     const secondIndex = (firstIndex ^ this.hash(fingerprint)) % this.maxItems;
 
     const firstPutResult = this.putToBucket(firstIndex, fingerprint);
@@ -117,10 +117,7 @@ export class CuckooFilter implements Filter<CFData, [number, string]> {
     const firstIndex = this.hash(text) % this.maxItems;
     const fingerprint = this.fingerprint(firstIndex);
 
-    return {
-      result: this.buckets.some(b => b.get(fingerprint)),
-      cache: [firstIndex, fingerprint] as const,
-    };
+    return this.buckets.some(b => b.get(fingerprint));
   }
 
   delete(_text: string) {

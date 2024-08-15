@@ -1,16 +1,13 @@
-import type { Filter } from '../filters/filter';
+import type { Filter, FilterType } from '../filters/filter';
 import type { RedditAPI } from '../utils/RedditAPI';
 import type { Synchroniser } from './synchroniser';
 
 type WithLock<T = Record<string, unknown>> = T & { lockedAt: number | null };
 
-export class RedditSynchroniser<
-  T extends Filter<Record<string, unknown>, unknown>,
-> implements Synchroniser<T>
-{
+export class RedditSynchroniser<T extends Filter> implements Synchroniser<T> {
   private redditAPI: RedditAPI;
 
-  private filterName: string;
+  private filterType: string;
 
   private initFilter: () => T;
 
@@ -18,22 +15,27 @@ export class RedditSynchroniser<
 
   private filterPostInfo = { url: '', name: '' };
 
-  constructor(reditAPI: RedditAPI, filterName: string, initFilter: () => T) {
+  constructor(
+    reditAPI: RedditAPI,
+    filterType: FilterType,
+    initFilter: () => T,
+  ) {
     this.redditAPI = reditAPI;
-    this.filterName = filterName;
+    this.filterType = filterType;
     this.initFilter = initFilter;
   }
 
-  async init() {
+  async init(): Promise<WithLock> {
     this.username = await this.redditAPI.getMe();
     const filterPost = await this.findFilter();
 
     if (filterPost) {
       this.filterPostInfo = { url: filterPost.url, name: filterPost.name };
-      return;
+      return JSON.parse(filterPost.selftext);
     }
 
     this.filterPostInfo = await this.makePost();
+    return await this.fetchFilter();
   }
 
   async synchronise(recentHistory: Set<string>) {
@@ -63,7 +65,7 @@ export class RedditSynchroniser<
       const postData = submissionsData.submissions.find(
         s =>
           s.author === this.username &&
-          s.title === `BloomSync: ${this.filterName}`,
+          s.title === `BloomSync: ${this.filterType}`,
       );
 
       if (postData) {
@@ -75,7 +77,7 @@ export class RedditSynchroniser<
   private async makePost() {
     return await this.redditAPI.submit(
       `u_${this.username}`,
-      `BloomSync: ${this.filterName}`,
+      `BloomSync: ${this.filterType}`,
       '',
     );
   }

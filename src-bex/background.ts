@@ -1,6 +1,4 @@
 import { bexBackground } from 'quasar/wrappers';
-import { StandardBloomFilter } from './filters/bloom-filter';
-import { CuckooFilter } from './filters/cuckoo-filter';
 import { RedditAPI, Status } from './utils/RedditAPI';
 import { StorageHandler } from './utils/storage';
 
@@ -14,7 +12,7 @@ chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('www/index.html') });
 });
 
-type AuthroiseResult =
+type AuthoriseResult =
   | { success: true }
   | { success: false; error: { message: string; cause: unknown } };
 
@@ -23,14 +21,11 @@ declare module '@quasar/app-vite' {
     getAuthURL: [never, string];
     authorise: [
       { status: Status; code: string; state: string },
-      AuthroiseResult,
+      AuthoriseResult,
     ];
     setSyncKey: [string, boolean];
   }
 }
-
-const bloomFilter = new StandardBloomFilter();
-const cuckooFilter = new CuckooFilter(10_000);
 
 const storage = new StorageHandler();
 const redditAPI = new RedditAPI(storage);
@@ -49,41 +44,36 @@ function onNavigation({
     return;
   }
 
-  console.time('[BloomFilter] get');
-  const { result: bfIsInHistory, cache: bfCache } = bloomFilter.get(url);
-  console.timeEnd('[BloomFilter] get');
-  if (bfIsInHistory) {
-    console.log(`[BloomFilter] visited: ${url}`);
-  } else {
-    console.log(`[BloomFilter] not visited: ${url}`);
+  // console.time('[BloomFilter] get');
+  // const { result: bfIsInHistory, cache: bfCache } = bloomFilter.get(url);
+  // console.timeEnd('[BloomFilter] get');
+  // if (bfIsInHistory) {
+  //   console.log(`[BloomFilter] visited: ${url}`);
+  // } else {
+  //   console.log(`[BloomFilter] not visited: ${url}`);
 
-    console.time('[BloomFilter] put');
-    bloomFilter.put(url, bfCache);
-    console.timeEnd('[BloomFilter] put');
-  }
+  //   console.time('[BloomFilter] put');
+  //   bloomFilter.put(url, bfCache);
+  //   console.timeEnd('[BloomFilter] put');
+  // }
 
-  console.time('[CuckooFilter] get');
-  const { result: cfIsInHistory, cache: cfCache } = cuckooFilter.get(url);
-  console.timeEnd('[CuckooFilter] get');
-  if (cfIsInHistory) {
-    console.log(`[CuckooFilter] visited: ${url}`);
-  } else {
-    console.log(`[CuckooFilter] not visited: ${url}`);
+  // console.time('[CuckooFilter] get');
+  // const { result: cfIsInHistory, cache: cfCache } = cuckooFilter.get(url);
+  // console.timeEnd('[CuckooFilter] get');
+  // if (cfIsInHistory) {
+  //   console.log(`[CuckooFilter] visited: ${url}`);
+  // } else {
+  //   console.log(`[CuckooFilter] not visited: ${url}`);
 
-    console.time('[CuckooFilter] put');
-    cuckooFilter.put(url, cfCache);
-    console.timeEnd('[CuckooFilter] put');
-  }
+  //   console.time('[CuckooFilter] put');
+  //   cuckooFilter.put(url, cfCache);
+  //   console.timeEnd('[CuckooFilter] put');
+  // }
 }
 
-export default bexBackground(async (bridge /* , allActiveConnections */) => {
-  // avoid attaching duplicate listeners every time the user opens a tab
-  const hasNavListener =
-    chrome.webNavigation.onCompleted.hasListener(onNavigation);
-  if (!hasNavListener) {
-    chrome.webNavigation.onCompleted.addListener(onNavigation);
-  }
+chrome.webNavigation.onCompleted.addListener(onNavigation);
 
+export default bexBackground(async (bridge /* , allActiveConnections */) => {
   const currentTab = (
     await chrome.tabs.query({ currentWindow: true, active: true })
   )[0];
