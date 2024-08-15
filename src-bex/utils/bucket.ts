@@ -17,14 +17,18 @@
 
 export class Bucket {
   private size: number;
-  private bucket: Array<string> = [];
+  private _bucket: Array<string> = [];
 
   constructor(size: number = 4) {
     this.size = size;
   }
 
+  get bucket(): Readonly<string[]> {
+    return Object.freeze(this.bucket);
+  }
+
   private get isFull() {
-    return this.bucket.length > this.size;
+    return this._bucket.length > this.size;
   }
 
   // reference: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
@@ -37,42 +41,46 @@ export class Bucket {
       return false;
     }
 
-    this.bucket.push(fingerprint);
+    this._bucket.push(fingerprint);
     return true;
   }
 
   get(fingerprint: string) {
-    return this.bucket.includes(fingerprint);
+    return this._bucket.includes(fingerprint);
   }
 
   delete(fingerprint: string) {
-    const index = this.bucket.indexOf(fingerprint);
+    const index = this._bucket.indexOf(fingerprint);
     if (index === -1) {
       return false;
     }
 
-    this.bucket.splice(index, 1);
+    this._bucket.splice(index, 1);
     return true;
   }
 
   swap(fingerprint: string) {
     const index = this.randomIndex;
 
-    const output = this.bucket[index];
-    this.bucket[index] = fingerprint;
+    const output = this._bucket[index];
+    this._bucket[index] = fingerprint;
 
     return output;
   }
 
   replace(from: string, to: string) {
-    const index = this.bucket.indexOf(from);
+    const index = this._bucket.indexOf(from);
 
     if (index === -1) {
       return false;
     }
 
-    this.bucket[index] = to;
+    this._bucket[index] = to;
 
     return true;
+  }
+
+  load(items: Readonly<string[]>) {
+    this._bucket = [...items];
   }
 }

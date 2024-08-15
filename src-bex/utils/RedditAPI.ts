@@ -14,6 +14,33 @@ type AccessTokenResponse = {
   token_type: 'bearer';
 };
 
+type Submission = {
+  title: string;
+  name: string; // kind & id, format: kind_id
+  author: string;
+  selftext: string;
+  url: string;
+};
+
+type GetSubmissionReponse =
+  | [{ data: { children: [Submission] } }]
+  | { message: string; error: number };
+
+type SubmissionListing = {
+  data: {
+    after: string | null;
+    children: { data: Submission }[];
+  };
+};
+
+type SubmitResponse = {
+  json: { errors: string[]; data: { url: string; name: string } };
+};
+
+type EditResponse = {
+  json: { errors: string[]; data: { things: [{ data: Submission }] } };
+};
+
 type RefreshTokenResponse = Omit<AccessTokenResponse, 'refresh_token'>;
 
 if (process.env.CLIENT_ID === undefined) {
@@ -33,7 +60,9 @@ export class RedditAPI {
     Authorization: `Basic ${globalThis.btoa(`${CLIENT_ID}:`)}`,
   };
 
-  private static readonly defaultParams = { raw_json: 1 };
+  private static readonly defaultParams = new URLSearchParams({
+    raw_json: '1',
+  });
 
   private state = '';
 
@@ -58,7 +87,7 @@ export class RedditAPI {
       state: this.state,
       redirect_uri: RedditAPI.REDIRECT_URI,
       duration: 'permanent',
-      scope: 'read submit',
+      scope: 'identity read submit',
     });
 
     return `${RedditAPI.BASE_URL}/api/v1/authorize?${params}`;
@@ -119,6 +148,101 @@ export class RedditAPI {
     this.expireAt = Date.now() + expiresIn * 1000;
 
     return refreshToken;
+  }
+
+  async getMe(): Promise<string> {
+    await this.refreshAccessToken();
+
+    const response = await fetch(
+      `${RedditAPI.OAUTH_BASE_URL}/api/v1/me?${RedditAPI.defaultParams}`,
+      this.OAuthConfig,
+    );
+    const data = await response.json();
+
+    return String(data.name);
+  }
+
+  async getSubmission(url: string) {
+    await this.refreshAccessToken();
+
+    const response = await fetch(
+      `${url}.json?${RedditAPI.defaultParams}`,
+      this.OAuthConfig,
+    );
+    const responseData = (await response.json()) as GetSubmissionReponse;
+
+    if (!Array.isArray(responseData)) {
+      throw new Error('Failed to get submission', {
+        cause: responseData.message,
+      });
+    }
+
+    return responseData[0].data.children[0];
+  }
+
+  async getSubmissions(username: string, after?: string) {
+    await this.refreshAccessToken();
+
+    const params = new URLSearchParams(RedditAPI.defaultParams);
+    if (after !== undefined) {
+      params.append('after', after);
+    }
+
+    const response = await fetch(
+      `${RedditAPI.OAUTH_BASE_URL}/r/u_${username}?${params}`,
+      this.OAuthConfig,
+    );
+
+    const { data } = (await response.json()) as SubmissionListing;
+
+    return { submissions: data.children.map(s => s.data), after: data.after };
+  }
+
+  async submit(subreddit: string, title: string, content: string) {
+    const body = new FormData();
+    body.append('sr', subreddit);
+    body.append('kind', 'self');
+    body.append('title', title);
+    body.append('text', content);
+    body.append('api_type', 'json');
+
+    const response = await fetch(`${RedditAPI.OAUTH_BASE_URL}/api/submit`, {
+      method: 'POST',
+      body,
+      ...this.OAuthConfig,
+    });
+
+    const { json } = (await response.json()) as SubmitResponse;
+
+    if (!json?.data?.url || !json.data.name) {
+      throw new Error('Failed to submit', { cause: 'submission_failed' });
+    }
+
+    const { url, name } = json.data;
+
+    return { url, name };
+  }
+
+  async edit(name: string, content: string) {
+    const body = new FormData();
+    body.append('api_type', 'json');
+    body.append('text', content);
+    body.append('thing_id', name);
+
+    const response = await fetch(
+      `${RedditAPI.OAUTH_BASE_URL}/api/editusertext`,
+      { method: 'POST', body, ...this.OAuthConfig },
+    );
+
+    const { json: responseData } = (await response.json()) as EditResponse;
+
+    if (responseData.errors.length) {
+      throw new Error('Failed to edit post', {
+        cause: responseData.errors.join(', '),
+      });
+    }
+
+    return responseData.data.things[0].data;
   }
 
   private async refreshAccessToken() {

@@ -1,6 +1,17 @@
+import Murmurhash from 'imurmurhash';
 import { Filter } from './filter';
 import { Bucket } from '../utils/bucket';
-import Murmurhash from 'imurmurhash';
+
+type SerialisedFilter = { [index: string]: Readonly<string[]> };
+
+export type CFData = {
+  filter: SerialisedFilter;
+  numItems: number;
+  maxItems: number;
+  fingerprintSize: number;
+  bucketSize: number;
+  maxKicks: number;
+};
 
 /*
  * Reference:
@@ -19,9 +30,9 @@ import Murmurhash from 'imurmurhash';
  * Accessed 05 Aug. 2024
  */
 
-export class CuckooFilter implements Filter<[number, string]> {
-  private capacity: number;
-  private count = 0;
+export class CuckooFilter implements Filter<CFData, [number, string]> {
+  private maxItems: number;
+  private numItems = 0;
   private bucketSize;
   private fingerprintSize: number;
   private maxKicks: number;
@@ -29,13 +40,13 @@ export class CuckooFilter implements Filter<[number, string]> {
   private seed: number;
 
   constructor(
-    capacity: number,
+    maxItems: number,
     errorRate = 0.000_000_1,
     bucketSize = 4,
     maxKicks = 500,
     syncKey: string,
   ) {
-    this.capacity = capacity;
+    this.maxItems = maxItems;
     this.bucketSize = bucketSize;
     this.fingerprintSize = Math.ceil(
       Math.log2(1 / errorRate) + Math.log2(2 * bucketSize),
@@ -44,22 +55,25 @@ export class CuckooFilter implements Filter<[number, string]> {
     this.seed = this.initialiseSeed(syncKey);
   }
 
-  put(_text: string, cache: Readonly<[number, string]> = [0, '']) {
-    // debugger;
-    const firstIndex = cache[0];
-    let fingerprint = cache[1];
-    const secondIndex = (firstIndex ^ this.hash(fingerprint)) % this.capacity;
+  put(text: string, cache?: Readonly<[number, string]>) {
+    if (this.numItems > this.maxItems) {
+      throw new Error('Cuckoo Filter is full', { cause: 'cuckoo_filter_full' });
+    }
+
+    const firstIndex = cache?.[0] || this.hash(text) % this.maxItems;
+    let fingerprint = cache?.[1] || this.fingerprint(firstIndex);
+    const secondIndex = (firstIndex ^ this.hash(fingerprint)) % this.maxItems;
 
     const firstPutResult = this.putToBucket(firstIndex, fingerprint);
     if (firstPutResult) {
-      this.count++;
+      this.numItems++;
       return true;
     }
 
     // bucket at first index is full, try the second one
     const secondPutResult = this.putToBucket(secondIndex, fingerprint);
     if (secondPutResult) {
-      this.count++;
+      this.numItems++;
       return true;
     }
 
@@ -69,12 +83,12 @@ export class CuckooFilter implements Filter<[number, string]> {
     let index = Math.random() < 0.5 ? firstIndex : secondIndex;
     for (let i = 0; i < this.maxKicks; i++) {
       fingerprint = this.buckets[index].swap(fingerprint);
-      index = (index ^ this.hash(fingerprint)) % this.capacity;
+      index = (index ^ this.hash(fingerprint)) % this.maxItems;
       log.push([index, fingerprint]);
 
       const retryResult = this.putToBucket(index, fingerprint);
       if (retryResult) {
-        this.count++;
+        this.numItems++;
         return true;
       }
     }
@@ -100,8 +114,7 @@ export class CuckooFilter implements Filter<[number, string]> {
   }
 
   get(text: string) {
-    // debugger;
-    const firstIndex = this.hash(text) % this.capacity;
+    const firstIndex = this.hash(text) % this.maxItems;
     const fingerprint = this.fingerprint(firstIndex);
 
     return {
@@ -112,6 +125,35 @@ export class CuckooFilter implements Filter<[number, string]> {
 
   delete(_text: string) {
     throw new Error('Not implemented');
+  }
+
+  export() {
+    const { numItems, maxItems, fingerprintSize, bucketSize, maxKicks } = this;
+
+    return {
+      filter: CuckooFilter.serialise(this.buckets),
+      numItems,
+      maxItems,
+      fingerprintSize,
+      bucketSize,
+      maxKicks,
+    };
+  }
+
+  load({
+    filter,
+    numItems,
+    maxItems,
+    fingerprintSize,
+    bucketSize,
+    maxKicks,
+  }: CFData) {
+    this.numItems = numItems;
+    this.maxItems = maxItems;
+    this.fingerprintSize = fingerprintSize;
+    this.bucketSize = bucketSize;
+    this.maxKicks = maxKicks;
+    this.buckets = CuckooFilter.deserialise(filter);
   }
 
   private hash(text: string) {
@@ -132,5 +174,29 @@ export class CuckooFilter implements Filter<[number, string]> {
 
   private initialiseSeed(key: string) {
     return new Murmurhash(key).result();
+  }
+
+  private static serialise(buckets: Bucket[]) {
+    return buckets.reduce<SerialisedFilter>((acc, curr, index) => {
+      if (!curr) {
+        return acc;
+      }
+
+      acc[index] = curr.bucket;
+
+      return acc;
+    }, {});
+  }
+
+  private static deserialise(serialisedFilter: SerialisedFilter) {
+    const buckets: Bucket[] = [];
+    Object.entries(serialisedFilter).forEach(([idx, bucketData]) => {
+      const bucket = new Bucket();
+      bucket.load(bucketData);
+      const index = Number.parseInt(idx);
+      buckets[index] = bucket;
+    });
+
+    return buckets;
   }
 }
