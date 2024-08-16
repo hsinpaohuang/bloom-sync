@@ -1,0 +1,23 @@
+{
+  "params": {
+    "icon": "./icon-designs/BloomSync_Visited.png",
+    "skipTrim": false,
+    "padding": [
+      0,
+      0
+    ],
+    "quality": 12
+  },
+  "assets": [
+    {
+      "generator": "png",
+      "name": "icon-visited-{size}x{size}.png",
+      "folder": "src-bex/icons",
+      "sizes": [
+        16,
+        48,
+        128
+      ]
+    }
+  ]
+}

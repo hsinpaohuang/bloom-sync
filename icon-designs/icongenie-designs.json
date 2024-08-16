@@ -1,0 +1,15 @@
+{
+  "params": {
+    "icon": "./icon-designs/BloomSyncLogo.png",
+    "include": [
+      "spa",
+      "bex"
+    ],
+    "skipTrim": false,
+    "padding": [
+      0,
+      0
+    ],
+    "quality": 12
+  }
+}
