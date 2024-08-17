@@ -6,6 +6,12 @@ export enum Status {
   Completed = 'completed',
 }
 
+export type RedditAuth = {
+  accessToken: string;
+  expireAt: number;
+  refreshToken: string;
+};
+
 type AccessTokenResponse = {
   access_token: string;
   expires_in: number; // seconds
@@ -68,7 +74,7 @@ export class RedditAPI {
 
   private accessToken = '';
 
-  private _refreshToken = '';
+  private refreshToken = '';
 
   private expireAt = 0; // milliseconds since Unix epoch
 
@@ -91,15 +97,6 @@ export class RedditAPI {
     });
 
     return `${RedditAPI.BASE_URL}/api/v1/authorize?${params}`;
-  }
-
-  private get refreshToken() {
-    return this._refreshToken;
-  }
-
-  private set refreshToken(token: string) {
-    this._refreshToken = token;
-    this.storageHandler.set('redditRefreshToken', token);
   }
 
   private get OAuthConfig() {
@@ -146,6 +143,12 @@ export class RedditAPI {
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
     this.expireAt = Date.now() + expiresIn * 1000;
+
+    await this.storageHandler.set('redditAuth', {
+      accessToken,
+      refreshToken,
+      expireAt: this.expireAt,
+    });
 
     return refreshToken;
   }
@@ -251,20 +254,22 @@ export class RedditAPI {
 
   private async refreshAccessToken() {
     if (!this.refreshToken) {
-      const refreshToken = await this.storageHandler.get('redditRefreshToken');
+      const redditAuth = await this.storageHandler.get('redditAuth');
 
-      if (!refreshToken) {
+      if (!redditAuth) {
         throw new Error('refreshToken is not defined', {
           cause: 'missing_refresh_token',
         });
       }
 
-      this.refreshToken = refreshToken;
+      this.accessToken = redditAuth.accessToken;
+      this.expireAt = redditAuth.expireAt;
+      this.refreshToken = redditAuth.refreshToken;
     }
 
-    const isTokenExpired = Date.now() - this.expireAt < 1000; // 1 second of buffer
+    const isTokenExpired = this.expireAt - Date.now() < 1000; // 1 second of buffer
 
-    if (this.accessToken || !isTokenExpired) {
+    if (this.accessToken && !isTokenExpired) {
       return;
     }
 
@@ -281,5 +286,26 @@ export class RedditAPI {
 
     this.accessToken = accessToken;
     this.expireAt = Date.now() + expiresIn * 1000;
+  }
+
+  /**
+   * Formats the given URL to the OAuth URL
+   *
+   * The URL returned by reddit API is using the normal origin
+   * (www.reddit.com) and not the OAuth origin (oauth.reddit.com).
+   *
+   * Without using the OAuth origin, accessing some things will result in 403,
+   * so we need to format the URL with the OAuth origin.
+   *
+   * @param normalURL the URL to be formatted
+   * @returns the formatted URL
+   */
+  static convertToOAuthURL(normalURL: string) {
+    if (!normalURL.startsWith(RedditAPI.OAUTH_BASE_URL)) {
+      return normalURL;
+    }
+
+    const url = new URL(normalURL);
+    return `${RedditAPI.OAUTH_BASE_URL}/${url.pathname}`;
   }
 }

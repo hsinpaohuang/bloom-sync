@@ -144,13 +144,30 @@ export class CuckooFilter implements Filter<CFData> {
     fingerprintSize,
     bucketSize,
     maxKicks,
-  }: CFData) {
-    this.numItems = numItems;
-    this.maxItems = maxItems;
-    this.fingerprintSize = fingerprintSize;
-    this.bucketSize = bucketSize;
-    this.maxKicks = maxKicks;
-    this.buckets = CuckooFilter.deserialise(filter);
+  }: Partial<CFData>) {
+    if (filter) {
+      this.buckets = CuckooFilter.deserialise(filter);
+    }
+
+    if (numItems) {
+      this.numItems = numItems;
+    }
+
+    if (maxItems) {
+      this.maxItems = maxItems;
+    }
+
+    if (fingerprintSize) {
+      this.fingerprintSize = fingerprintSize;
+    }
+
+    if (bucketSize) {
+      this.bucketSize = bucketSize;
+    }
+
+    if (maxKicks) {
+      this.maxKicks = maxKicks;
+    }
   }
 
   private hash(text: string) {

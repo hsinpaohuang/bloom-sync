@@ -1,8 +1,8 @@
 import { Filter } from '../filters/filter';
 
-export type Synchroniser<T extends Filter> = {
+export type Synchroniser = {
   init(): Promise<Record<string, unknown>>;
-  synchronise(recentHistory: Set<string>): Promise<T>;
+  synchronise(recentHistory: Set<string>): Promise<Filter>;
 };
 
 export enum SyncProvider {

@@ -1,9 +1,10 @@
 import type { FilterType } from '../filters/filter';
 import { SyncProvider } from '../synchroniser/synchroniser';
+import { RedditAuth } from './RedditAPI';
 
 export type Storage = {
   syncKey: string;
-  redditRefreshToken: string;
+  redditAuth: RedditAuth;
   filterType: FilterType;
   syncProvider: SyncProvider;
   recentHistory: string[];

@@ -3,7 +3,7 @@ export interface Filter<FilterData = Record<string, unknown>> {
   get(text: string): boolean;
   delete(text: string): void;
   export(): FilterData;
-  load(filter: FilterData): void;
+  load(filter: Partial<FilterData>): void;
 }
 
 export enum FilterType {

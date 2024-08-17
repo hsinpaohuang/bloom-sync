@@ -1,22 +1,38 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import type { QStepper } from 'quasar';
+import { useQuasar, type QStepper } from 'quasar';
 import SyncKeyGenerationStep from './SyncKeyGenerationStep.vue';
 import RedditAuthStep from './RedditAuthStep.vue';
 import SetupCompleteStep from './SetupCompleteStep.vue';
 
 const router = useRouter();
+const { bex, notify } = useQuasar();
 
 const step = ref(0);
 const stepper = ref<InstanceType<typeof QStepper> | null>(null);
 
-function onGoBack() {
+const isLoading = ref(false);
+
+async function onGoBack() {
   switch (step.value) {
     case 0:
       router.push({ name: 'setup' });
       break;
     case 2:
+      isLoading.value = true;
+      const { data: success } = await bex.send('setupCompleted');
+      if (!success) {
+        notify({
+          message: 'Sorry, something went wrong. Please try again later',
+          color: 'negative',
+        });
+
+        isLoading.value = false;
+
+        return;
+      }
+
       window.close();
       break;
     default:
@@ -24,7 +40,7 @@ function onGoBack() {
   }
 }
 
-const navLabel = computed(() => (step.value === 2 ? 'Close' : 'Back'));
+const navLabel = computed(() => (step.value === 2 ? 'Finish' : 'Back'));
 </script>
 
 <template>
@@ -75,7 +91,12 @@ const navLabel = computed(() => (step.value === 2 ? 'Close' : 'Back'));
 
     <template #navigation>
       <QStepperNavigation>
-        <QBtn color="primary" :label="navLabel" @click="onGoBack" />
+        <QBtn
+          color="primary"
+          :label="navLabel"
+          :loading="isLoading"
+          @click="onGoBack"
+        />
       </QStepperNavigation>
     </template>
   </QStepper>

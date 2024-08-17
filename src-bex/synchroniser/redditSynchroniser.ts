@@ -1,15 +1,15 @@
 import type { Filter, FilterType } from '../filters/filter';
-import type { RedditAPI } from '../utils/RedditAPI';
+import { RedditAPI } from '../utils/RedditAPI';
 import type { Synchroniser } from './synchroniser';
 
 type WithLock<T = Record<string, unknown>> = T & { lockedAt: number | null };
 
-export class RedditSynchroniser<T extends Filter> implements Synchroniser<T> {
+export class RedditSynchroniser implements Synchroniser {
   private redditAPI: RedditAPI;
 
   private filterType: string;
 
-  private initFilter: () => T;
+  private initFilter: () => Filter;
 
   private username = '';
 
@@ -18,7 +18,7 @@ export class RedditSynchroniser<T extends Filter> implements Synchroniser<T> {
   constructor(
     reditAPI: RedditAPI,
     filterType: FilterType,
-    initFilter: () => T,
+    initFilter: () => Filter,
   ) {
     this.redditAPI = reditAPI;
     this.filterType = filterType;
@@ -31,10 +31,15 @@ export class RedditSynchroniser<T extends Filter> implements Synchroniser<T> {
 
     if (filterPost) {
       this.filterPostInfo = { url: filterPost.url, name: filterPost.name };
-      return JSON.parse(filterPost.selftext);
+      return JSON.parse(filterPost.selftext || '{}');
     }
 
     this.filterPostInfo = await this.makePost();
+
+    this.filterPostInfo.url = RedditAPI.convertToOAuthURL(
+      this.filterPostInfo.url,
+    );
+
     return await this.fetchFilter();
   }
 
@@ -97,7 +102,7 @@ export class RedditSynchroniser<T extends Filter> implements Synchroniser<T> {
       this.filterPostInfo.url,
     );
 
-    return JSON.parse(postData.selftext);
+    return JSON.parse(postData.selftext || '{}');
   }
 
   private async edit(content: WithLock): Promise<WithLock> {
@@ -106,6 +111,6 @@ export class RedditSynchroniser<T extends Filter> implements Synchroniser<T> {
       JSON.stringify(content),
     );
 
-    return JSON.parse(editResult.selftext);
+    return JSON.parse(editResult.selftext || '{}');
   }
 }

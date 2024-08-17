@@ -1,12 +1,15 @@
 import { bexBackground } from 'quasar/wrappers';
 import { RedditAPI, Status } from './utils/RedditAPI';
 import { StorageHandler } from './utils/storage';
+import { HistoryHandler } from './historyHandler';
 
-chrome.runtime.onInstalled.addListener(() =>
+chrome.runtime.onInstalled.addListener(async () => {
+  await chrome.storage.local.clear();
+
   chrome.tabs.create({
     url: chrome.runtime.getURL('www/index.html#/welcome'),
-  }),
-);
+  });
+});
 
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('www/index.html') });
@@ -24,67 +27,87 @@ declare module '@quasar/app-vite' {
       AuthoriseResult,
     ];
     setSyncKey: [string, boolean];
+    setupCompleted: [never, boolean];
   }
 }
 
 const storage = new StorageHandler();
 const redditAPI = new RedditAPI(storage);
+const historyHandler = new HistoryHandler(storage);
 
-function onNavigation({
-  frameType,
-  url,
-}: chrome.webNavigation.WebNavigationFramedCallbackDetails) {
-  // ignore iframes
-  if (frameType !== 'outermost_frame') {
+function iconPaths(type: 'default' | 'visited' | 'not-visited') {
+  const formattedType = type === 'default' ? '' : `-${type}`;
+
+  return {
+    16: `icons/icon${formattedType}-16x16.png`,
+    48: `icons/icon${formattedType}-48x48.png`,
+    128: `icons/icon${formattedType}-128x128.png`,
+  };
+}
+
+async function initHistoryHandler() {
+  const syncKey = await storage.get('syncKey');
+
+  if (syncKey === undefined) {
+    throw new Error('Sync key not found in storage', {
+      cause: 'sync_key_missing',
+    });
+  }
+
+  await historyHandler.init();
+}
+
+initHistoryHandler().catch((error: Error) => {
+  if (error.cause === 'sync_key_missing') {
+    return;
+  }
+
+  throw error;
+});
+
+function onNavigation(_tabId: number, { url }: chrome.tabs.TabChangeInfo) {
+  // historyHandler might not have been initialised (e.g. if onboarding is not completed yet)
+  if (!historyHandler.isInitialised) {
+    return;
+  }
+
+  // if url was not changed, it will be undefined
+  if (!url) {
     return;
   }
 
   // ignore non-http requests (e.g. chrome://)
   if (!url.startsWith('http')) {
+    chrome.action.setIcon({
+      path: iconPaths('default'),
+    });
     return;
   }
 
-  // console.time('[BloomFilter] get');
-  // const { result: bfIsInHistory, cache: bfCache } = bloomFilter.get(url);
-  // console.timeEnd('[BloomFilter] get');
-  // if (bfIsInHistory) {
-  //   console.log(`[BloomFilter] visited: ${url}`);
-  // } else {
-  //   console.log(`[BloomFilter] not visited: ${url}`);
-
-  //   console.time('[BloomFilter] put');
-  //   bloomFilter.put(url, bfCache);
-  //   console.timeEnd('[BloomFilter] put');
-  // }
-
-  // console.time('[CuckooFilter] get');
-  // const { result: cfIsInHistory, cache: cfCache } = cuckooFilter.get(url);
-  // console.timeEnd('[CuckooFilter] get');
-  // if (cfIsInHistory) {
-  //   console.log(`[CuckooFilter] visited: ${url}`);
-  // } else {
-  //   console.log(`[CuckooFilter] not visited: ${url}`);
-
-  //   console.time('[CuckooFilter] put');
-  //   cuckooFilter.put(url, cfCache);
-  //   console.timeEnd('[CuckooFilter] put');
-  // }
+  // change icon
+  const isInHistory = historyHandler.get(url);
+  chrome.action.setIcon({
+    path: iconPaths(isInHistory ? 'visited' : 'not-visited'),
+  });
 }
 
-chrome.webNavigation.onCompleted.addListener(onNavigation);
+chrome.tabs.onUpdated.addListener(onNavigation);
 
 export default bexBackground(async (bridge /* , allActiveConnections */) => {
   const currentTab = (
     await chrome.tabs.query({ currentWindow: true, active: true })
   )[0];
+
   if (currentTab.url?.includes(chrome.runtime.id)) {
     bridge.on('setSyncKey', async ({ data, respond }) => {
       await storage.set('syncKey', data);
       respond(true);
     });
+
     bridge.on('getAuthURL', ({ respond }) => {
       respond(redditAPI.authURL);
     });
+
     bridge.on('authorise', async ({ data, respond }) => {
       const { status, code, state } = data;
       try {
@@ -93,6 +116,16 @@ export default bexBackground(async (bridge /* , allActiveConnections */) => {
       } catch (e) {
         const { message, cause } = e as Error;
         respond({ success: false, error: { message, cause } });
+      }
+    });
+
+    bridge.on('setupCompleted', async ({ respond }) => {
+      try {
+        await initHistoryHandler();
+        respond(true);
+      } catch (e) {
+        respond(false);
+        throw e;
       }
     });
   }

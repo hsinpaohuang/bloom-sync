@@ -76,11 +76,22 @@ export class StandardBloomFilter implements Filter<SBFData> {
     };
   }
 
-  load({ filter, numItems, size, maxItems }: SBFData) {
-    this.bitArray = StandardBloomFilter.decode(filter, this.size);
-    this.numItems = numItems;
-    this.size = size;
-    this.maxItems = maxItems;
+  load({ filter, numItems, size, maxItems }: Partial<SBFData>) {
+    if (filter) {
+      this.bitArray = StandardBloomFilter.decode(filter, this.size);
+    }
+
+    if (numItems) {
+      this.numItems = numItems;
+    }
+
+    if (size) {
+      this.size = size;
+    }
+
+    if (maxItems) {
+      this.maxItems = maxItems;
+    }
   }
 
   private hash(text: string, seed: number) {

@@ -1,4 +1,3 @@
-import { debounce } from 'quasar';
 import { StandardBloomFilter } from './filters/bloom-filter';
 import { CuckooFilter } from './filters/cuckoo-filter';
 import { Filter, FilterType } from './filters/filter';
@@ -8,16 +7,22 @@ import { RedditAPI } from './utils/RedditAPI';
 import { StorageHandler } from './utils/storage';
 
 export class HistoryHandler {
+  private _isInitialised = false;
+
   private recentHistory = new Set<string>();
 
   private storageHandler: StorageHandler;
 
   private filter?: Filter;
 
-  private synchroniser?: Synchroniser<Filter>;
+  private synchroniser?: Synchroniser;
 
   constructor(storageHandler: StorageHandler) {
     this.storageHandler = storageHandler;
+  }
+
+  get isInitialised() {
+    return this._isInitialised;
   }
 
   async init() {
@@ -49,6 +54,8 @@ export class HistoryHandler {
     const filterData = await this.synchroniser.init();
     this.filter = this.initFilter(filterType, syncKey);
     this.filter.load(filterData);
+
+    this._isInitialised = true;
   }
 
   get(url: string) {
@@ -63,7 +70,7 @@ export class HistoryHandler {
   }
 
   async synchronise() {
-    if (!this.synchroniser) {
+    if (!this.isInitialised || !this.synchroniser) {
       throw new Error('HistoryHandler has not been initialised yet', {
         cause: 'historyHandler_not_init',
       });
@@ -75,9 +82,7 @@ export class HistoryHandler {
 
   private put(url: string) {
     this.recentHistory.add(url);
-    debounce(() => {
-      this.storageHandler.set('recentHistory', Array.from(this.recentHistory));
-    }, 1000);
+    this.storageHandler.set('recentHistory', Array.from(this.recentHistory));
   }
 
   private refreshRecentHistory() {
