@@ -77,7 +77,11 @@ export class HistoryHandler {
     }
 
     const history = this.refreshRecentHistory();
-    this.filter = await this.synchroniser.synchronise(history);
+
+    const newFilter = await this.synchroniser.synchronise(history);
+    if (newFilter !== undefined) {
+      this.filter = newFilter;
+    }
   }
 
   private put(url: string) {

@@ -4,15 +4,14 @@ import { StorageHandler } from './utils/storage';
 import { HistoryHandler } from './historyHandler';
 
 chrome.runtime.onInstalled.addListener(async () => {
-  await chrome.storage.local.clear();
+  await Promise.allSettled([
+    chrome.storage.local.clear(),
+    chrome.alarms.clearAll(),
+  ]);
 
   chrome.tabs.create({
     url: chrome.runtime.getURL('www/index.html#/welcome'),
   });
-});
-
-chrome.action.onClicked.addListener(() => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('www/index.html') });
 });
 
 type AuthoriseResult =
@@ -34,6 +33,8 @@ declare module '@quasar/app-vite' {
 const storage = new StorageHandler();
 const redditAPI = new RedditAPI(storage);
 const historyHandler = new HistoryHandler(storage);
+
+const SYNC_ALARM_KEY = 'sync-alarm';
 
 function iconPaths(type: 'default' | 'visited' | 'not-visited') {
   const formattedType = type === 'default' ? '' : `-${type}`;
@@ -57,15 +58,56 @@ async function initHistoryHandler() {
   await historyHandler.init();
 }
 
-initHistoryHandler().catch((error: Error) => {
-  if (error.cause === 'sync_key_missing') {
+/**
+ * Setup the alarms for periodically syncing the filter.
+ *
+ * Assumes HistoryHandler has been initialised.
+ */
+async function setupAlarm() {
+  const alarm = await chrome.alarms.get(SYNC_ALARM_KEY);
+
+  if (alarm === undefined) {
+    chrome.alarms.create(SYNC_ALARM_KEY, {
+      delayInMinutes: 5,
+      periodInMinutes: 5,
+    });
+  }
+
+  if (chrome.alarms.onAlarm.hasListener(onAlarm)) {
     return;
   }
 
-  throw error;
-});
+  chrome.alarms.onAlarm.addListener(onAlarm);
+}
 
-function onNavigation(_tabId: number, { url }: chrome.tabs.TabChangeInfo) {
+async function onAlarm(alarm: chrome.alarms.Alarm) {
+  if (alarm.name !== SYNC_ALARM_KEY) {
+    return;
+  }
+
+  await historyHandler.synchronise();
+
+  // not sure if alarms will fire after the browser has been closed,
+  // in case it does, remove the listener
+  const tabs = await chrome.tabs.query({});
+  if (tabs.length !== 0) {
+    return;
+  }
+
+  chrome.alarms.onAlarm.removeListener(onAlarm);
+}
+
+initHistoryHandler()
+  .then(setupAlarm)
+  .catch((error: Error) => {
+    if (error.cause === 'sync_key_missing') {
+      return;
+    }
+
+    throw error;
+  });
+
+function onTabUpdated(url: string | undefined) {
   // historyHandler might not have been initialised (e.g. if onboarding is not completed yet)
   if (!historyHandler.isInitialised) {
     return;
@@ -91,7 +133,18 @@ function onNavigation(_tabId: number, { url }: chrome.tabs.TabChangeInfo) {
   });
 }
 
-chrome.tabs.onUpdated.addListener(onNavigation);
+// update filter & icon when user navigates to a different page
+// uses tabs.onUpdated instead of webNavigation because not all changes to URL
+// will send out a request (e.g. searchParams, hash, SPA in browser router)
+chrome.tabs.onUpdated.addListener((_tabID, { url }) => {
+  onTabUpdated(url);
+});
+
+// update filter & icon when user switches to another tab
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  const tabInfo = await chrome.tabs.get(tabId);
+  onTabUpdated(tabInfo.url);
+});
 
 export default bexBackground(async (bridge /* , allActiveConnections */) => {
   const currentTab = (
@@ -122,6 +175,8 @@ export default bexBackground(async (bridge /* , allActiveConnections */) => {
     bridge.on('setupCompleted', async ({ respond }) => {
       try {
         await initHistoryHandler();
+        await setupAlarm();
+
         respond(true);
       } catch (e) {
         respond(false);

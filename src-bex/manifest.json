@@ -9,12 +9,15 @@
   "permissions": [
     "storage",
     "tabs",
-    "activeTab"
+    "activeTab",
+    "alarms"
   ],
   "host_permissions": [
     "*://*/*"
   ],
-  "action": {},
+  "action": {
+    "default_popup": "www/index.html#/popup"
+  },
   "background": {
     "service_worker": "background.js"
   },

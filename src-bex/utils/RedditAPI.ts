@@ -93,7 +93,7 @@ export class RedditAPI {
       state: this.state,
       redirect_uri: RedditAPI.REDIRECT_URI,
       duration: 'permanent',
-      scope: 'identity read submit',
+      scope: 'identity read submit edit',
     });
 
     return `${RedditAPI.BASE_URL}/api/v1/authorize?${params}`;
@@ -301,7 +301,7 @@ export class RedditAPI {
    * @returns the formatted URL
    */
   static convertToOAuthURL(normalURL: string) {
-    if (!normalURL.startsWith(RedditAPI.OAUTH_BASE_URL)) {
+    if (normalURL.startsWith(RedditAPI.OAUTH_BASE_URL)) {
       return normalURL;
     }
 

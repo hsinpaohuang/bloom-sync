@@ -2,7 +2,10 @@ import type { Filter, FilterType } from '../filters/filter';
 import { RedditAPI } from '../utils/RedditAPI';
 import type { Synchroniser } from './synchroniser';
 
-type WithLock<T = Record<string, unknown>> = T & { lockedAt: number | null };
+type WithSync<T = Record<string, unknown>> = T & {
+  lockedAt: number | null;
+  updatedAt: number;
+};
 
 export class RedditSynchroniser implements Synchroniser {
   private redditAPI: RedditAPI;
@@ -15,6 +18,8 @@ export class RedditSynchroniser implements Synchroniser {
 
   private filterPostInfo = { url: '', name: '' };
 
+  private _updatedAt = 0; // timestamp
+
   constructor(
     reditAPI: RedditAPI,
     filterType: FilterType,
@@ -25,12 +30,19 @@ export class RedditSynchroniser implements Synchroniser {
     this.initFilter = initFilter;
   }
 
-  async init(): Promise<WithLock> {
+  get updatedAt() {
+    return this._updatedAt;
+  }
+
+  async init(): Promise<WithSync> {
     this.username = await this.redditAPI.getMe();
     const filterPost = await this.findFilter();
 
     if (filterPost) {
-      this.filterPostInfo = { url: filterPost.url, name: filterPost.name };
+      this.filterPostInfo = {
+        url: RedditAPI.convertToOAuthURL(filterPost.url),
+        name: filterPost.name,
+      };
       return JSON.parse(filterPost.selftext || '{}');
     }
 
@@ -46,14 +58,25 @@ export class RedditSynchroniser implements Synchroniser {
   async synchronise(recentHistory: Set<string>) {
     const postData = await this.aquireLock();
 
+    if (postData.updatedAt < this._updatedAt && recentHistory.size === 0) {
+      // nothing to sync
+      return;
+    }
+
     const filter = this.initFilter();
     filter.load(postData);
 
-    recentHistory.forEach(url => {
-      filter.put(url);
-    });
+    if (recentHistory.size !== 0) {
+      recentHistory.forEach(url => {
+        filter.put(url);
+      });
 
-    await this.edit({ ...filter.export(), lockedAt: null });
+      await this.edit({
+        ...filter.export(),
+        lockedAt: null,
+        updatedAt: Date.now(),
+      });
+    }
 
     return filter;
   }
@@ -90,14 +113,14 @@ export class RedditSynchroniser implements Synchroniser {
   private async aquireLock() {
     const filterData = await this.fetchFilter();
 
-    if (filterData.lockedAt !== null) {
+    if (Number.isInteger(filterData.lockedAt)) {
       throw new Error('Locked', { cause: 'locked' });
     }
 
     return await this.edit({ ...filterData, lockedAt: Date.now() });
   }
 
-  private async fetchFilter(): Promise<WithLock> {
+  private async fetchFilter(): Promise<WithSync> {
     const postData = await this.redditAPI.getSubmission(
       this.filterPostInfo.url,
     );
@@ -105,7 +128,7 @@ export class RedditSynchroniser implements Synchroniser {
     return JSON.parse(postData.selftext || '{}');
   }
 
-  private async edit(content: WithLock): Promise<WithLock> {
+  private async edit(content: WithSync): Promise<WithSync> {
     const editResult = await this.redditAPI.edit(
       this.filterPostInfo.name,
       JSON.stringify(content),
