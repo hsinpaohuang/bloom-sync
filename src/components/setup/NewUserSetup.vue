@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useQuasar, type QStepper } from 'quasar';
 import SyncKeyGenerationStep from './SyncKeyGenerationStep.vue';
-import RedditAuthStep from './RedditAuthStep.vue';
+import ChooseFilterStep from './ChooseFilterStep.vue';
 import SetupCompleteStep from './SetupCompleteStep.vue';
 
 const router = useRouter();
@@ -58,20 +58,11 @@ const navLabel = computed(() => (step.value === 2 ? 'Finish' : 'Back'));
     <QStep
       :name="1"
       :done="step > 1"
-      icon="login"
-      active-icon="login"
-      title="Log in with your Reddit account"
+      icon="storage"
+      active-icon="storage"
+      title="Choose a filter"
     >
-      <RedditAuthStep @complete="stepper?.next">
-        <p>
-          We'll use your Reddit account to synchronise your browsing history by
-          posting the "filter" in a post.
-          <!-- TODO: add links to explaining how bloom filter & cuckoo filter work -->
-          <br />
-          (Don't worry, without the sync key, nobody can read your browsing
-          history.)
-        </p>
-      </RedditAuthStep>
+      <ChooseFilterStep @complete="stepper?.next" />
     </QStep>
 
     <QStep

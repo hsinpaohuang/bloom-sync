@@ -1,7 +1,7 @@
 import { bexBackground } from 'quasar/wrappers';
-import { RedditAPI, Status } from './utils/RedditAPI';
 import { StorageHandler } from './utils/storage';
 import { HistoryHandler } from './historyHandler';
+import { FilterType } from './filters/filter';
 
 chrome.runtime.onInstalled.addListener(async () => {
   await Promise.allSettled([
@@ -14,24 +14,15 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
 });
 
-type AuthoriseResult =
-  | { success: true }
-  | { success: false; error: { message: string; cause: unknown } };
-
 declare module '@quasar/app-vite' {
   interface BexEventMap {
-    getAuthURL: [never, string];
-    authorise: [
-      { status: Status; code: string; state: string },
-      AuthoriseResult,
-    ];
     setSyncKey: [string, boolean];
+    setFilterType: [FilterType, boolean];
     setupCompleted: [never, boolean];
   }
 }
 
 const storage = new StorageHandler();
-const redditAPI = new RedditAPI(storage);
 const historyHandler = new HistoryHandler(storage);
 
 const SYNC_ALARM_KEY = 'sync-alarm';
@@ -68,8 +59,8 @@ async function setupAlarm() {
 
   if (alarm === undefined) {
     chrome.alarms.create(SYNC_ALARM_KEY, {
-      delayInMinutes: 5,
-      periodInMinutes: 5,
+      delayInMinutes: 1,
+      periodInMinutes: 1,
     });
   }
 
@@ -157,19 +148,9 @@ export default bexBackground(async (bridge /* , allActiveConnections */) => {
       respond(true);
     });
 
-    bridge.on('getAuthURL', ({ respond }) => {
-      respond(redditAPI.authURL);
-    });
-
-    bridge.on('authorise', async ({ data, respond }) => {
-      const { status, code, state } = data;
-      try {
-        await redditAPI.authorise(status, code, state);
-        respond({ success: true });
-      } catch (e) {
-        const { message, cause } = e as Error;
-        respond({ success: false, error: { message, cause } });
-      }
+    bridge.on('setFilterType', async ({ data, respond }) => {
+      await storage.set('filterType', data);
+      respond(true);
     });
 
     bridge.on('setupCompleted', async ({ respond }) => {

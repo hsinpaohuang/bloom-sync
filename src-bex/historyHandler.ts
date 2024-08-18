@@ -1,9 +1,8 @@
 import { StandardBloomFilter } from './filters/bloom-filter';
 import { CuckooFilter } from './filters/cuckoo-filter';
 import { Filter, FilterType } from './filters/filter';
-import { RedditSynchroniser } from './synchroniser/redditSynchroniser';
+import { LocalSynchroniser } from './synchroniser/localSynchroniser';
 import { Synchroniser, SyncProvider } from './synchroniser/synchroniser';
-import { RedditAPI } from './utils/RedditAPI';
 import { StorageHandler } from './utils/storage';
 
 export class HistoryHandler {
@@ -30,7 +29,7 @@ export class HistoryHandler {
       await Promise.all([
         (await this.storageHandler.get('filterType')) ||
           FilterType.StandardBloomFilter,
-        (await this.storageHandler.get('syncProvider')) || SyncProvider.Reddit,
+        (await this.storageHandler.get('syncProvider')) || SyncProvider.Local,
         this.storageHandler.get('syncKey'),
         this.storageHandler.get('recentHistory'),
       ]);
@@ -103,10 +102,14 @@ export class HistoryHandler {
     syncKey: string,
   ) {
     switch (provider) {
-      case SyncProvider.Reddit:
-        const redditAPI = new RedditAPI(this.storageHandler);
+      case SyncProvider.Local:
         const initFilter = () => this.initFilter(filterType, syncKey);
-        return new RedditSynchroniser(redditAPI, filterType, initFilter);
+        return new LocalSynchroniser(this.storageHandler, initFilter);
+
+      default:
+        throw new Error('Invalid sync provider', {
+          cause: 'invalid_sync_provider',
+        });
     }
   }
 
@@ -116,6 +119,9 @@ export class HistoryHandler {
         return new StandardBloomFilter(syncKey, 280_000, 9_700);
       case FilterType.CuckooFilter:
         return new CuckooFilter(syncKey, 1_700);
+
+      default:
+        throw new Error('Invalid filter', { cause: 'invalid_filter_type' });
     }
   }
 }
