@@ -178,6 +178,8 @@ chrome.action.onClicked.addListener(async () => {
   });
 
   await chrome.action.openPopup();
+
+  await chrome.action.setPopup({ popup: '' });
 });
 
 export default bexBackground(async (bridge /* , allActiveConnections */) => {
