@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useQuasar } from 'quasar';
+import {
+  matContentPaste,
+  matVisibility,
+  matVisibilityOff,
+} from '@quasar/extras/material-icons';
 
 const emit = defineEmits<{ (e: 'complete'): void }>();
 
@@ -48,7 +53,7 @@ async function copyToClipboard() {
       >
         <template #append>
           <QIcon
-            :name="revealKey ? 'visibility' : 'visibility_off'"
+            :name="revealKey ? matVisibility : matVisibilityOff"
             class="cursor-pointer"
             @click="toggleRevealKey"
           />
@@ -56,8 +61,8 @@ async function copyToClipboard() {
       </QInput>
 
       <QBtn
+        :icon="matContentPaste"
         color="secondary"
-        icon="content_paste"
         label="Copy to clipboard"
         @click="copyToClipboard"
       />

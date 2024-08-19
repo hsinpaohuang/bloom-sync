@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useQuasar, type QStepper } from 'quasar';
+import { matKey, matStorage, matCheck } from '@quasar/extras/material-icons';
 import SyncKeyGenerationStep from './SyncKeyGenerationStep.vue';
 import ChooseFilterStep from './ChooseFilterStep.vue';
 import SetupCompleteStep from './SetupCompleteStep.vue';
@@ -48,8 +49,8 @@ const navLabel = computed(() => (step.value === 2 ? 'Finish' : 'Back'));
     <QStep
       :name="0"
       :done="step > 0"
-      icon="key"
-      active-icon="key"
+      :icon="matKey"
+      :active-icon="matKey"
       title="Sync Key Generation"
     >
       <SyncKeyGenerationStep @complete="stepper?.next" />
@@ -58,8 +59,8 @@ const navLabel = computed(() => (step.value === 2 ? 'Finish' : 'Back'));
     <QStep
       :name="1"
       :done="step > 1"
-      icon="storage"
-      active-icon="storage"
+      :icon="matStorage"
+      :active-icon="matStorage"
       title="Choose a filter"
     >
       <ChooseFilterStep @complete="stepper?.next" />
@@ -68,8 +69,8 @@ const navLabel = computed(() => (step.value === 2 ? 'Finish' : 'Back'));
     <QStep
       :name="2"
       :done="step > 2"
-      icon="check"
-      active-icon="check"
+      :icon="matCheck"
+      :active-icon="matCheck"
       title="All set"
     >
       <SetupCompleteStep>

@@ -19,10 +19,24 @@ const routes: RouteRecordRaw[] = [
     ],
   },
 
+  // popup
+  {
+    path: '/popup',
+    component: () => import('layouts/PopupLayout.vue'),
+    children: [
+      {
+        path: '',
+        component: () => import('pages/PopupIndex.vue'),
+        name: 'popupIndex',
+      },
+    ],
+  },
+
   // Always leave this as last one,
   // but you can also remove it
   {
     path: '/:catchAll(.*)*',
+    name: 'notFound',
     component: () => import('pages/ErrorNotFound.vue'),
   },
 ];
