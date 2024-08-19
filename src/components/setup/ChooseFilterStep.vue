@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
+import { outlinedHelp } from '@quasar/extras/material-icons-outlined';
 import { FilterType } from 'app/src-bex/filters/filter';
 
 const emit = defineEmits<{ (e: 'complete'): void }>();
@@ -22,8 +23,17 @@ async function setFilterType() {
 </script>
 
 <template>
-  <p>Choose a filter</p>
-  <!-- todo: add explanation of filters -->
+  <p>
+    Choose a filter
+    <QBtn
+      href="#/about"
+      target="_blank"
+      :icon="outlinedHelp"
+      size="sm"
+      flat
+      round
+    />
+  </p>
   <QOptionGroup
     v-model="filterOption"
     :options="options"

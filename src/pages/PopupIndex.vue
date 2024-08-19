@@ -41,8 +41,14 @@ const iconProps = computed(() =>
     <QIcon v-bind="iconProps" size="30vw" />
     <p v-if="currentPageData.hasVisited" class="q-px-lg">
       You <i>most likely</i> have visited this page before
-      <!-- todo: explain filter -->
-      <QBtn :icon="outlinedHelp" size="sm" flat round @click="console.log" />
+      <QBtn
+        href="#/about"
+        target="_blank"
+        :icon="outlinedHelp"
+        size="sm"
+        flat
+        round
+      />
     </p>
     <div v-else class="q-px-lg q-pb-lg">
       <span>This is the first time you have visited this page</span>
