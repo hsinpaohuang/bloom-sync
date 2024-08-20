@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 defineOptions({
   name: 'App'
 });

@@ -1,3 +1,6 @@
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 /* eslint-disable */
 
 // Forces TS to apply `@quasar/app-vite` augmentations of `quasar` package

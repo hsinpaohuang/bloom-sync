@@ -1,3 +1,6 @@
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 /* eslint-disable */
 
 /// <reference types="vite/client" />

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// Modified from template provided by Quasar Framework
+// https://quasar.dev/
+
 import logoWhiteURL from 'assets/bloom-sync-logo-white.png';
 </script>
 

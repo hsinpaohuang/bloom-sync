@@ -1,3 +1,6 @@
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 /* eslint-disable */
 // https://github.com/michael-ciniawsky/postcss-load-config
 

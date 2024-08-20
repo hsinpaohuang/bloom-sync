@@ -1,3 +1,6 @@
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 // Hooks added here have a bridge allowing communication between the BEX Content Script and the Quasar Application.
 // More info: https://quasar.dev/quasar-cli/developing-browser-extensions/content-hooks
 

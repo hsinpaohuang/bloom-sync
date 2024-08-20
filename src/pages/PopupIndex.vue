@@ -10,13 +10,10 @@ if (route.query.url === null || route.query.hasVisited === null) {
   router.push({ name: 'notFound' });
 }
 
-// todo: replace placeholder
 const currentPageData = computed(() => ({
   url: route.query.url as string,
   hasVisited: route.query.hasVisited === '1',
 }));
-
-console.log(route.query, currentPageData.value);
 
 const urlHost = computed(() => new URL(currentPageData.value.url).host);
 

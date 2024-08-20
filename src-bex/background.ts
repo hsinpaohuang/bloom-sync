@@ -1,3 +1,6 @@
+// Modified from template provided by Quasar Framework
+// https://quasar.dev/
+
 import { bexBackground } from 'quasar/wrappers';
 import { StorageHandler } from './utils/storage';
 import { HistoryHandler } from './utils/historyHandler';

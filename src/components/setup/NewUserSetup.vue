@@ -74,10 +74,7 @@ const navLabel = computed(() => (step.value === 2 ? 'Finish' : 'Back'));
       title="All set"
     >
       <SetupCompleteStep>
-        Your browsing history will now be automatically synchronised.
-        <br />
-        Install this extension on another browser to synchronise the browsing
-        history of both browsers.
+        Your browsing history will now be automatically stored.
       </SetupCompleteStep>
     </QStep>
 

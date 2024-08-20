@@ -1,3 +1,6 @@
+// Modified from template provided by Quasar Framework
+// https://quasar.dev/
+
 import type { RouteRecordRaw } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [

@@ -1,3 +1,6 @@
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 import { route } from 'quasar/wrappers';
 import {
   createMemoryHistory,

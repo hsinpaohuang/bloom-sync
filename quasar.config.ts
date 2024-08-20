@@ -1,3 +1,6 @@
+// Template provided by Quasar Framework
+// https://quasar.dev/
+
 /* eslint-env node */
 
 // Configuration for your app
