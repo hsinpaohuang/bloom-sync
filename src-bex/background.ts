@@ -1,6 +1,6 @@
 import { bexBackground } from 'quasar/wrappers';
 import { StorageHandler } from './utils/storage';
-import { HistoryHandler } from './historyHandler';
+import { HistoryHandler } from './utils/historyHandler';
 import { FilterType } from './filters/filter';
 
 chrome.runtime.onInstalled.addListener(async () => {

@@ -1,9 +1,9 @@
-import { StandardBloomFilter } from './filters/bloom-filter';
-import { CuckooFilter } from './filters/cuckoo-filter';
-import { Filter, FilterType } from './filters/filter';
-import { LocalSynchroniser } from './synchroniser/localSynchroniser';
-import { Synchroniser, SyncProvider } from './synchroniser/synchroniser';
-import { StorageHandler } from './utils/storage';
+import { StandardBloomFilter } from '../filters/bloom-filter';
+import { CuckooFilter } from '../filters/cuckoo-filter';
+import { Filter, FilterType } from '../filters/filter';
+import { LocalSynchroniser } from '../synchroniser/localSynchroniser';
+import { Synchroniser, SyncProvider } from '../synchroniser/synchroniser';
+import { StorageHandler } from './storage';
 
 export class HistoryHandler {
   private _isInitialised = false;
