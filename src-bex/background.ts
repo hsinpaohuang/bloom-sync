@@ -6,15 +6,19 @@ import { StorageHandler } from './utils/storage';
 import { HistoryHandler } from './utils/historyHandler';
 import { FilterType } from './filters/filter';
 
+function openWelcomePage() {
+  chrome.tabs.create({
+    url: chrome.runtime.getURL('www/index.html#/welcome'),
+  });
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   await Promise.allSettled([
     chrome.storage.local.clear(),
     chrome.alarms.clearAll(),
   ]);
 
-  chrome.tabs.create({
-    url: chrome.runtime.getURL('www/index.html#/welcome'),
-  });
+  openWelcomePage();
 });
 
 declare module '@quasar/app-vite' {
@@ -27,8 +31,6 @@ declare module '@quasar/app-vite' {
 
 const storage = new StorageHandler();
 const historyHandler = new HistoryHandler(storage);
-
-const currentPageInfo = { url: '', hasVisited: false };
 
 const SYNC_ALARM_KEY = 'sync-alarm';
 
@@ -97,25 +99,13 @@ initHistoryHandler()
   .then(setupAlarm)
   .catch((error: Error) => {
     if (error.cause === 'sync_key_missing') {
+      chrome.action.onClicked.addListener(openWelcomePage);
+
       return;
     }
 
     throw error;
   });
-
-function validateCurrentURL(url: string) {
-  // historyHandler might not have been initialised (e.g. if onboarding is not completed yet)
-  if (!historyHandler.isInitialised) {
-    return;
-  }
-
-  // ignore non-http pages (e.g. chrome://)
-  if (!url.startsWith('http')) {
-    return;
-  }
-
-  return url;
-}
 
 function onTabUpdated(url: string | undefined) {
   // if url was not changed, it will be undefined
@@ -123,27 +113,33 @@ function onTabUpdated(url: string | undefined) {
     return;
   }
 
-  const validatedURL = validateCurrentURL(url);
-  if (!validatedURL) {
+  if (!historyHandler.isInitialised) {
+    return;
+  }
+
+  if (!url.startsWith('http')) {
     chrome.action.setIcon({
       path: iconPaths('default'),
     });
 
+    chrome.action.setPopup({ popup: '' });
+
     return;
   }
 
-  const hasVisited = historyHandler.get(validatedURL);
-
-  currentPageInfo.url = validatedURL;
-  currentPageInfo.hasVisited = hasVisited;
+  const hasVisited = historyHandler.get(url);
 
   chrome.action.setIcon({
     path: iconPaths(hasVisited ? 'visited' : 'not-visited'),
   });
-}
 
-async function getCurrentTab() {
-  return (await chrome.tabs.query({ currentWindow: true, active: true }))[0];
+  const query = new URLSearchParams({
+    url,
+    hasVisited: hasVisited ? '1' : '0',
+  });
+  chrome.action.setPopup({
+    popup: chrome.runtime.getURL(`www/index.html#/popup?${query}`),
+  });
 }
 
 // update filter & icon when user navigates to a different page
@@ -159,34 +155,10 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   onTabUpdated(tabInfo.url);
 });
 
-chrome.action.onClicked.addListener(async () => {
-  const activeTab = await getCurrentTab();
-
-  if (!activeTab.url) {
-    return;
-  }
-
-  const currentURL = validateCurrentURL(activeTab.url);
-  if (!currentURL || currentURL !== currentPageInfo.url) {
-    return;
-  }
-
-  const query = new URLSearchParams({
-    url: currentURL,
-    hasVisited: currentPageInfo.hasVisited ? '1' : '0',
-  });
-
-  await chrome.action.setPopup({
-    popup: chrome.runtime.getURL(`www/index.html#/popup?${query}`),
-  });
-
-  await chrome.action.openPopup();
-
-  await chrome.action.setPopup({ popup: '' });
-});
-
 export default bexBackground(async (bridge /* , allActiveConnections */) => {
-  const currentTab = await getCurrentTab();
+  const currentTab = (
+    await chrome.tabs.query({ currentWindow: true, active: true })
+  )[0];
 
   if (currentTab.url?.includes(chrome.runtime.id)) {
     bridge.on('setSyncKey', async ({ data, respond }) => {
@@ -203,6 +175,8 @@ export default bexBackground(async (bridge /* , allActiveConnections */) => {
       try {
         await initHistoryHandler();
         await setupAlarm();
+
+        chrome.action.onClicked.removeListener(openWelcomePage);
 
         respond(true);
       } catch (e) {
