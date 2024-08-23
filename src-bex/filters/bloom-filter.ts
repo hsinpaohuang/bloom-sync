@@ -27,6 +27,12 @@ export class StandardBloomFilter implements Filter<SBFData> {
   // therefore, we limit BITS_PER_CHUNK to 8 to avoid errors
   private static BITS_PER_CHUNK = 8 as const;
 
+  // In utf-8 encoding, many characters between 0 ~ 161 are controls,
+  // which will be escaped by JSON.stringify when encoding.
+  // From 161 to 417 is a range of 256 characters that are not controls, which
+  // works better for efficient encoding and coverting between utf8 and utf16
+  private static STARTING_CODE = 161;
+
   constructor(syncKey: string, size: number, maxItems: number) {
     this.seeds = this.initialiseSeeds(syncKey);
     this.bitArray = [];
@@ -133,10 +139,11 @@ export class StandardBloomFilter implements Filter<SBFData> {
       );
       const binaryString = chunk.join('');
       const decimal = Number.parseInt(binaryString, 2);
-      buffer += String.fromCharCode(decimal);
+      buffer += String.fromCharCode(
+        decimal + StandardBloomFilter.STARTING_CODE,
+      );
     }
 
-    // use utf-8 to encode the bitArray to ensure compatibility
     return utf8.encode(buffer);
   }
 
@@ -145,7 +152,9 @@ export class StandardBloomFilter implements Filter<SBFData> {
 
     return decoded.reduce<number[]>((acc, curr, index, arr) => {
       const decimal = curr.charCodeAt(0);
-      const binaryString = decimal.toString(2);
+      const binaryString = (
+        decimal - StandardBloomFilter.STARTING_CODE
+      ).toString(2);
       const chunk = binaryString.split('').map(Number);
 
       // add padding to make sure each chunk is exactly 8 bits except for the last one,

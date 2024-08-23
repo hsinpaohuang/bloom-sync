@@ -24,7 +24,7 @@ export class Bucket {
   }
 
   get bucket(): Readonly<string[]> {
-    return Object.freeze(this.bucket);
+    return Object.freeze(this._bucket);
   }
 
   private get isFull() {

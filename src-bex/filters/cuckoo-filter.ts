@@ -2,7 +2,7 @@ import Murmurhash from 'imurmurhash';
 import { Filter } from './filter';
 import { Bucket } from '../utils/bucket';
 
-type SerialisedFilter = { [index: string]: Readonly<string[]> };
+type SerialisedFilter = { [index: string]: Readonly<number[]> };
 
 export type CFData = {
   filter: SerialisedFilter;
@@ -39,20 +39,30 @@ export class CuckooFilter implements Filter<CFData> {
   private buckets: Bucket[] = [];
   private seed: number;
 
+  // murmurhash output is a 32 bit int
+  private static MAX_FINGERPRINT_SIZE = 32;
+
   constructor(
     syncKey: string,
     maxItems: number,
-    errorRate = 10e-7,
+    errorRate = 1e-7,
     bucketSize = 4,
     maxKicks = 500,
   ) {
     this.seed = this.initialiseSeed(syncKey);
     this.maxItems = maxItems;
     this.bucketSize = bucketSize;
+    this.maxKicks = maxKicks;
+
     this.fingerprintSize = Math.ceil(
       Math.log2(1 / errorRate) + Math.log2(2 * bucketSize),
     );
-    this.maxKicks = maxKicks;
+
+    if (this.fingerprintSize > CuckooFilter.MAX_FINGERPRINT_SIZE) {
+      throw new Error(
+        'fingerprint size is too long, please increase errorRate or decrease bucketSize',
+      );
+    }
   }
 
   put(text: string) {
@@ -60,8 +70,9 @@ export class CuckooFilter implements Filter<CFData> {
       throw new Error('Cuckoo Filter is full', { cause: 'cuckoo_filter_full' });
     }
 
-    const firstIndex = this.hash(text) % this.maxItems;
-    let fingerprint = this.fingerprint(firstIndex);
+    const hash = this.hash(text);
+    const firstIndex = hash % this.maxItems;
+    let fingerprint = this.fingerprint(hash);
     const secondIndex = (firstIndex ^ this.hash(fingerprint)) % this.maxItems;
 
     const firstPutResult = this.putToBucket(firstIndex, fingerprint);
@@ -114,8 +125,7 @@ export class CuckooFilter implements Filter<CFData> {
   }
 
   get(text: string) {
-    const firstIndex = this.hash(text) % this.maxItems;
-    const fingerprint = this.fingerprint(firstIndex);
+    const fingerprint = this.fingerprint(this.hash(text));
 
     return this.buckets.some(b => b.get(fingerprint));
   }
@@ -175,7 +185,15 @@ export class CuckooFilter implements Filter<CFData> {
   }
 
   private fingerprint(hash: number) {
-    return String(hash).slice(0, this.fingerprintSize);
+    const binary = hash.toString(2);
+
+    const paddingLength = CuckooFilter.MAX_FINGERPRINT_SIZE - binary.length;
+    const paddedBinary =
+      paddingLength === 0
+        ? binary
+        : `${Array(paddingLength).fill(0).join('')}${binary}`;
+
+    return paddedBinary.slice(0, this.fingerprintSize);
   }
 
   private putToBucket(index: number, fingerprint: string) {
@@ -196,7 +214,9 @@ export class CuckooFilter implements Filter<CFData> {
         return acc;
       }
 
-      acc[index] = curr.bucket;
+      acc[index] = curr.bucket.map(fingerprint =>
+        Number.parseInt(fingerprint, 2),
+      );
 
       return acc;
     }, {});
@@ -206,7 +226,7 @@ export class CuckooFilter implements Filter<CFData> {
     const buckets: Bucket[] = [];
     Object.entries(serialisedFilter).forEach(([idx, bucketData]) => {
       const bucket = new Bucket();
-      bucket.load(bucketData);
+      bucket.load(bucketData.map(fingerprint => fingerprint.toString(2)));
       const index = Number.parseInt(idx);
       buckets[index] = bucket;
     });
