@@ -70,10 +70,9 @@ export class CuckooFilter implements Filter<CFData> {
       throw new Error('Cuckoo Filter is full', { cause: 'cuckoo_filter_full' });
     }
 
-    const hash = this.hash(text);
-    const firstIndex = hash % this.maxItems;
-    let fingerprint = this.fingerprint(hash);
-    const secondIndex = (firstIndex ^ this.hash(fingerprint)) % this.maxItems;
+    const indices = this.indices(text);
+    const { firstIndex, secondIndex } = indices;
+    let fingerprint = indices.fingerprint;
 
     const firstPutResult = this.putToBucket(firstIndex, fingerprint);
     if (firstPutResult) {
@@ -125,9 +124,13 @@ export class CuckooFilter implements Filter<CFData> {
   }
 
   get(text: string) {
-    const fingerprint = this.fingerprint(this.hash(text));
+    const { firstIndex, secondIndex, fingerprint } = this.indices(text);
 
-    return this.buckets.some(b => b.get(fingerprint));
+    return (
+      this.buckets[firstIndex]?.get(fingerprint) ||
+      this.buckets[secondIndex]?.get(fingerprint) ||
+      false
+    );
   }
 
   delete(_text: string) {
@@ -194,6 +197,15 @@ export class CuckooFilter implements Filter<CFData> {
         : `${Array(paddingLength).fill(0).join('')}${binary}`;
 
     return paddedBinary.slice(0, this.fingerprintSize);
+  }
+
+  private indices(text: string) {
+    const hash = this.hash(text);
+    const firstIndex = hash % this.maxItems;
+    const fingerprint = this.fingerprint(hash);
+    const secondIndex = (firstIndex ^ this.hash(fingerprint)) % this.maxItems;
+
+    return { firstIndex, secondIndex, fingerprint };
   }
 
   private putToBucket(index: number, fingerprint: string) {
