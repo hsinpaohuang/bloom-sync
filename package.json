@@ -1,8 +1,8 @@
 {
-  "name": "bloom-twitter",
+  "name": "bloom-sync",
   "version": "0.0.1",
-  "description": "Cross-browser history synchronisation browser extension",
-  "productName": "BloomTwitter",
+  "description": "A cross-browser history synchronisation browser extension",
+  "productName": "BloomSync",
   "author": "hsinpaohuang <hsinpaohuang@gmail.com>",
   "type": "module",
   "private": true,
