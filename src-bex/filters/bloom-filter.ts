@@ -35,7 +35,7 @@ export class StandardBloomFilter implements Filter<SBFData> {
 
   constructor(syncKey: string, size: number, maxItems: number) {
     this.seeds = this.initialiseSeeds(syncKey);
-    this.bitArray = [];
+    this.bitArray = Array(size).fill(0);
     this.size = size;
     this.maxItems = maxItems;
   }
